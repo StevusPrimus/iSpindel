@@ -617,7 +617,16 @@ bool uploadData(uint8_t service)
     sender.add("interval", myData.sleeptime);
     sender.add("RSSI", WiFi.RSSI());
     CONSOLELN(F("\ncalling MQTT"));
-    return sender.sendMQTT(myData.server, myData.port, myData.username, myData.password, myData.name);
+    int32 sleeptime_candidate_s = sender.sendMQTT(myData.server, myData.port, myData.username, myData.password, myData.name);
+    if (sleeptime_candidate_s > 0)
+    {
+      myData.sleeptime = sleeptime_candidate_s;
+      return true;
+    }
+    else
+    {
+      return false;
+    }
   }
 #endif
 

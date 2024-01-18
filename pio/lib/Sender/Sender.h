@@ -28,7 +28,7 @@ public:
   bool sendInfluxDB(String server, uint16_t port, String uri, String name, String username, String password, bool usehttps);
   bool sendPrometheus(String server, uint16_t port, String job, String instance);
   bool sendUbidots(String token, String name);
-  bool sendMQTT(String server, uint16_t port, String username, String password, String name);
+  int32 sendMQTT(String server, uint16_t port, String username, String password, String name);
   bool sendFHEM(String server, uint16_t port, String name);
   bool sendTCONTROL(String server, uint16_t port);
   bool sendBlynk(char* token);
@@ -56,6 +56,7 @@ private:
   StaticJsonDocument<512> _doc;
   WiFiClientSecure _secureClient;
   MD5Builder _md5;
+  int32 nextResponseTime = 0;
 };
 
 #endif

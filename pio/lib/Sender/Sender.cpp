@@ -114,7 +114,7 @@ bool SenderClass::mqttConnect(const String &server, uint16_t port, const String 
   _mqttClient.setServer(server.c_str(), port);
   _mqttClient.setCallback(
       [this](char *topic, byte *payload, unsigned int length) { this->mqttCallback(topic, payload, length); });
-
+  
   byte i = 0;
 
   while (!_mqttClient.connected() && (i < 3))
@@ -133,6 +133,11 @@ bool SenderClass::mqttConnect(const String &server, uint16_t port, const String 
     if (ret)
     {
       CONSOLELN(F("Connected to MQTT"));
+      String topic = (String("ispindel/" + name + "/command")).c_str();
+      if (_mqttClient.subscribe((String("ispindel/" + name + "/command")).c_str()), 1) {
+        CONSOLELN("Subscribe to "+topic);
+      }
+
       return true;
     }
     else
@@ -264,13 +269,14 @@ bool SenderClass::disableHassioDiscovery(String server, uint16_t port, String us
 }
 #endif
 
-bool SenderClass::sendMQTT(String server, uint16_t port, String username, String password, String name)
+int32 SenderClass::sendMQTT(String server, uint16_t port, String username, String password, String name)
 {
   bool response = mqttConnect(server, port, name, username, password);
   if (response)
   {
+    _mqttClient.loop();
     //MQTT publish values
-    for (const auto &kv : _doc.as<JsonObject>())
+    for (auto kv : _doc.as<JsonObject>())
     {
       CONSOLELN("MQTT publish: ispindel/" + name + "/" + kv.key().c_str() + "/" + kv.value().as<String>());
       _mqttClient.publish(("ispindel/" + name + "/" + kv.key().c_str()).c_str(), kv.value().as<String>().c_str());
@@ -278,22 +284,49 @@ bool SenderClass::sendMQTT(String server, uint16_t port, String username, String
           .loop(); //This should be called regularly to allow the client to process incoming messages and maintain its connection to the server.
     }
   }
+  _mqttClient.publish((String("ispindel/" + name + "/payload")).c_str() , _doc.as<String>().c_str());
+  _mqttClient.loop();
 
   CONSOLELN(F("Closing MQTT connection"));
   _mqttClient.disconnect();
   stopclient();
-  return response;
+  return nextResponseTime;
 }
 
 void SenderClass::mqttCallback(char *topic, byte *payload, unsigned int length)
 {
-  CONSOLELN(F("MQTT message arrived ["));
-  CONSOLELN(topic);
+  CONSOLE(F("MQTT message arrived ["));
+  CONSOLE(topic);
   CONSOLELN(F("] "));
+  bool isNumber = true;
   for (unsigned int i = 0; i < length; i++)
-  {
-    CONSOLE((char)payload[i]);
+  {    
+    uint8_t byte = payload[i];
+    if (byte < 0x30 || byte > 0x39)
+    {
+      isNumber = false;
+      break;
+    }
   }
+  char str[length + 1];
+  memcpy(str, payload, length);
+  str[length] = 0;
+  String value = String(str);
+  if (isNumber)
+  {
+    CONSOLELN("MQTT message is a number");
+    int32 intValue = value.toInt();
+    if (intValue > 0 && intValue <= 900)
+    { 
+      nextResponseTime = intValue;
+    }
+  }
+  else
+  {
+    CONSOLELN("MQTT message is a string");
+  }
+  CONSOLELN(value);
+  CONSOLELN("MQTT message end");
 }
 
 bool SenderClass::sendSecureMQTT(char CACert[], char deviceCert[], char deviceKey[], String server, uint16_t port,
@@ -357,7 +390,7 @@ bool SenderClass::sendThingSpeak(String token, long Channel)
 
   CONSOLELN(F("\nSender: ThingSpeak posting"));
 
-  for (const auto &kv : _doc.as<JsonObject>())
+  for (auto kv : _doc.as<JsonObject>())
   {
     field++;
     ThingSpeak.setField(field, kv.value().as<String>());
@@ -491,7 +524,7 @@ bool SenderClass::sendInfluxDB(String server, uint16_t port, String uri, String 
   msg += name;
   msg += " ";
 
-  for (const auto &kv : _doc.as<JsonObject>())
+  for (auto kv : _doc.as<JsonObject>())
   {
     msg += kv.key().c_str();
     msg += "=";
@@ -553,7 +586,7 @@ bool SenderClass::sendPrometheus(String server, uint16_t port, String job, Strin
 
   //Build up the data for the Prometheus Pushgateway
   //A gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
-  for (const auto &kv : _doc.as<JsonObject>())
+  for (auto kv : _doc.as<JsonObject>())
   {
     msg += "# TYPE ";
     msg += kv.key().c_str();
@@ -646,7 +679,7 @@ bool SenderClass::sendFHEM(String server, uint16_t port, String name)
     String msg = String("GET /fhem?cmd.Test=set%20");
     msg += name;
 
-    for (const auto &kv : _doc.as<JsonObject>())
+    for (auto kv : _doc.as<JsonObject>())
     {
       msg += "%20";
       msg += kv.value().as<String>();
@@ -695,7 +728,7 @@ bool SenderClass::sendTCONTROL(String server, uint16_t port)
     CONSOLELN(F("\nSender: TCONTROL"));
     String msg;
 
-    for (const auto &kv : _doc.to<JsonObject>())
+    for (auto kv : _doc.to<JsonObject>())
     {
       msg += kv.key().c_str();
       msg += ": ";
@@ -751,7 +784,7 @@ bool SenderClass::sendBlynk(char *token)
   {
     CONSOLELN(F("\nConnected to the Blynk server, sending data"));
 
-    for (const auto &kv : _doc.as<JsonObject>())
+    for (auto kv : _doc.as<JsonObject>())
     {
       _pin = atoi(kv.key().c_str());
       _value = kv.value().as<String>();
