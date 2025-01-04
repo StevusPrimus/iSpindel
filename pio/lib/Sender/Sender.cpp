@@ -260,12 +260,14 @@ bool SenderClass::disableHassioDiscovery(String server, uint16_t port, String us
   if (response)
   {
     auto chipid = String(ESP.getChipId(), HEX);
-    String topic = "homeassistant/sensor/iSpindel_" + chipid + "/";
-    _mqttClient.publish((topic + "temperature/config").c_str(), "");
-    _mqttClient.publish((topic + "tilt/config").c_str(), "");
-    _mqttClient.publish((topic + "battery/config").c_str(), "");
-    _mqttClient.publish((topic + "rssi/config").c_str(), "");
-    _mqttClient.publish((topic + "gravity/config").c_str(), "");
+    String topicSensor = "homeassistant/sensor/iSpindel_" + chipid + "/";
+    String topicNumber = "homeassistant/number/iSpindel_" + chipid + "/";
+    _mqttClient.publish((topicSensor + "temperature/config").c_str(), "");
+    _mqttClient.publish((topicSensor + "tilt/config").c_str(), "");
+    _mqttClient.publish((topicSensor + "battery/config").c_str(), "");
+    _mqttClient.publish((topicSensor + "rssi/config").c_str(), "");
+    _mqttClient.publish((topicSensor + "gravity/config").c_str(), "");
+    _mqttClient.publish((topicNumber + "interval/config").c_str(), "");
     _mqttClient.loop();
   }
   CONSOLELN(F("Closing MQTT connection"));
